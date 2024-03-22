@@ -1,0 +1,17 @@
+docker build -t jmspider .
+docker save jmspider -o jmspdier.tar
+sudo docker load --input jmspdier.tar
+sudo docker run -d --name=JMSpider -v /var/windows/data:/var/jmspider/data jmspider
+sudo docker ps -a
+sudo docker exec -it JMSpider /bin/bash
+
+sudo docker rm JMSpider
+sudo docker rmi jmspider
+
+sudo docker start JMSpider
+sudo docker attach --sig-proxy=false JMSpider
+sudo docker stop JMSpider
+sudo kill -s SIGINT 进程id
+
+
+sudo mount -t cifs -o username=CYM,password="",uid=1000,gid=1000 //192.168.5.3/禁漫天堂 /var/windows

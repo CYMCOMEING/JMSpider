@@ -1,0 +1,1 @@
+/usr/local/bin/python /var/jmspider/main.py
