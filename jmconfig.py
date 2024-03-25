@@ -20,7 +20,9 @@ json_dir = os.path.join(os.path.abspath('.'), 'data')
 os.makedirs(json_dir, exist_ok=True)
 # if not os.path.exists(json_dir):
 #     os.mkdir(json_dir)
-    
+
+DOWNLOAD_QUEUE = os.path.join(json_dir, 'download_queue.json')
+DOWN_DEFUALT = {'download_queue': []}
 JSON_PATH = os.path.join(json_dir, 'config.json')
 DEFUALT_DATA = {
     "filter_tag": [
@@ -58,6 +60,7 @@ DEFUALT_DATA = {
                 "AVS": ""
     },
     "cookie_update": "",
+    "proxies": None,
     "redownload":[],
     "redownloading":[]
 }
@@ -71,8 +74,12 @@ DEFUALT_DATA = {
 class MyConfig(dict):
     def __init__(self, config_path: str) -> None:
         self.fio = None
-        self.fio = open(config_path, 'r+', encoding='utf-8')
-        json_data = json.load(self.fio)
+        self.fio = open(config_path, 'a+', encoding='utf-8')
+        self.fio.seek(0)  # 追加方式打开，指针会在最后
+        data = self.fio.read()
+        if not data: # 文件内容为空时，json会报错
+            data = "{}"
+        json_data = json.loads(data)
         self.update(json_data)
 
     def save(self):
@@ -97,7 +104,12 @@ class MyConfig(dict):
 
     def get(self, key, default=None):
         return super().get(key, default)
-    
-cfg = MyConfig(JSON_PATH)
-if not cfg:
-    cfg.update(DEFUALT_DATA)
+
+def config_init(file:str, defualt = None) -> dict:
+    conf = MyConfig(file)
+    if defualt and (not conf):
+        conf.update(defualt)
+    return conf
+
+cfg = config_init(JSON_PATH, DEFUALT_DATA)
+down_queue = config_init(DOWNLOAD_QUEUE, DOWN_DEFUALT)
