@@ -28,8 +28,7 @@ from MySigint import MySigint
 
 
 # TODO git创建分支再提交，测试完成再合并
-# TODO 2.现有id传入数据库(临) 3.配置文件控制下载的内容 
-# TODO 4.更正目录名(临) 5.树莓派运行 6.控制台输出美化 7.图片查看器同步更新
+# TODO 5.树莓派运行 6.控制台输出美化 7.图片查看器同步更新
 
 TMP_DIR = os.path.join('.', 'tmp')
 if not os.path.exists(TMP_DIR):
@@ -251,9 +250,9 @@ class JMSpider:
         Returns:
             bool: 是否成功
         """
-        if not cookies:
-            cookies = {}
-        cookies['_gali'] = 'wrapper'
+        # if not cookies:
+        #     cookies = {}
+        # cookies['_gali'] = 'wrapper'
 
         headers = {
             'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,'
@@ -302,14 +301,12 @@ class JMSpider:
             res_list['url'] = url[0]
 
         res_list['title'] = ''
-        title = root_element.xpath(
-            '//*[@id="wrapper"]/div[5]/div[4]/div/div[2]/div[1]/div[1]/h1/text()')
+        title = root_element.xpath('//div[@class="panel-heading"]/div[@itemprop="name"]/h1/text()')
         if title:
             res_list['title'] = title[0]
 
         res_list['comicid'] = ''
-        comicid = root_element.xpath(
-            '//*[@id="wrapper"]/div[5]/div[4]/div/div[2]/div[2]/div/div[2]/div[1]/div[1]/text()')
+        comicid = root_element.xpath('//div[@class="panel-body"]/div/div[2]/div[1]/div[1]/text()')
         if comicid:
             comp = re.compile(r'JM(\d+)')
             res = re.findall(comp, comicid[0])
@@ -317,20 +314,17 @@ class JMSpider:
                 res_list['comicid'] = res[0]
 
         res_list['tags'] = None
-        tags = root_element.xpath(
-            '//*[@id="wrapper"]/div[5]/div[4]/div/div[2]/div[2]/div/div[2]/div[1]/div[4]/span/a/text()')
+        tags = root_element.xpath('//div[@class="panel-body"]/div/div[2]/div[1]/div[4]/span[@data-type="tags"]/a/text()')
         if tags:
             res_list['tags'] = tags
 
         res_list['author'] = None
-        author = root_element.xpath(
-            '//*[@id="wrapper"]/div[5]/div[4]/div/div[2]/div[2]/div/div[2]/div[1]/div[5]/span/a/text()')
+        author = root_element.xpath('//div[@class="panel-body"]/div/div[2]/div[1]/div[5]/span/a/text()')
         if author:
             res_list['author'] = author
 
         res_list['description'] = ''
-        description = root_element.xpath(
-            '//*[@id="wrapper"]/div[5]/div[4]/div/div[2]/div[2]/div/div[2]/div[1]/div[8]/text()')
+        description = root_element.xpath('//div[@class="panel-body"]/div/div[2]/div[1]/div[8]/text()')
         if description:
             comp = re.compile(r'敘述：(.*)', re.DOTALL)
             res = re.findall(comp, description[0])
@@ -338,8 +332,7 @@ class JMSpider:
                 res_list['description'] = res[0]
 
         res_list['page'] = 0
-        page = root_element.xpath(
-            '//*[@id="wrapper"]/div[5]/div[4]/div/div[2]/div[2]/div/div[2]/div[1]/div[9]/text()')
+        page = root_element.xpath('//div[@class="panel-body"]/div/div[2]/div[1]/div[9]/text()')
         if page:
             comp = re.compile(r'頁數：(\d+)')
             res = re.findall(comp, page[0])
@@ -347,8 +340,7 @@ class JMSpider:
                 res_list['page'] = int(res[0])
 
         res_list['next'] = None
-        next = root_element.xpath(
-            '//*[@id="wrapper"]/div[5]/div[4]/div/div[2]/div[2]/div/div[2]/div[3]/div/ul/a/@data-album')
+        next = root_element.xpath('//div[@class="panel-body"]/div/div[2]/div[3]/div//ul/a/@data-album')
         if next:
             res_list['next'] = next
 
@@ -658,7 +650,7 @@ class JMSpider:
                     page_data_to_db(self.db, comicid, page_data)
                     logger.info(f'{comicid} 下载页数数据成功。')
         except Exception as e:
-            logger.error(f'{comicid} 下载页数数据出错。error:{e}')
+            logger.error(f'{comicid} 页面可能不存在或者需要登录。error:{e}')
         finally:
             if os.path.exists(tmp_file):
                 os.unlink(tmp_file)
@@ -687,8 +679,9 @@ class JMSpider:
                 url, tmp_file, self.cfg.get('cookie', None))
             if res:
                 home_data = self.parse_home_page(tmp_file)
-                home_data_to_db(self.db, home_data)
-                logger.info(f'{comicid} 下载主页数据成功。')
+                if home_data['page'] != 0:
+                    home_data_to_db(self.db, home_data)
+                    logger.info(f'{comicid} 下载主页数据成功。')
         except Exception as e:
             logger.error(f'{comicid} 下载主页数据出错。error:{e}')
         finally:

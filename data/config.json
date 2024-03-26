@@ -33,44 +33,18 @@
     "download_file": "D:\\禁漫天堂\\data\\ids.txt",
     "out_zip": "D:\\禁漫天堂\\data\\禁漫天堂\\mcomic.zip",
     "filter_dir": [
-        "D:\\禁漫天堂\\data\\禁漫天堂",
         "D:\\禁漫天堂\\data\\禁漫天堂\\通过",
-        "D:\\禁漫天堂\\data\\禁漫天堂\\黑名单",
         "D:\\禁漫天堂\\data\\禁漫天堂\\集合",
-        "D:\\禁漫天堂\\data\\禁漫天堂\\未整理",
-        "D:\\禁漫天堂\\data\\禁漫天堂\\测试"
+        "D:\\禁漫天堂\\data\\禁漫天堂\\未整理"
     ],
     "blacklist": "D:\\禁漫天堂\\data\\禁漫天堂\\黑名单",
     "username": "jm18268",
     "password": "asd646598890..",
     "cookie": {
-        "AVS": "o2nitg3kke5k02k1ll9o2mlrqs"
+        "AVS": "ujihs07clue9e3usbp2uq08rjo"
     },
     "cookie_update": "2024-03-14",
     "proxies": {"http": "http://localhost:7890", "https": "http://localhost:7890"},
     "redownload": [],
-    "redownloading": [
-        "121351",
-        "471887",
-        "7347",
-        "89303",
-        "89526",
-        "90076",
-        "90976",
-        "91284",
-        "91480",
-        "91666",
-        "91723",
-        "92095",
-        "94616",
-        "95104",
-        "95654",
-        "95967",
-        "96325",
-        "96746",
-        "97309",
-        "99089",
-        "99351",
-        "99360"
-    ]
+    "redownloading": []
 }
