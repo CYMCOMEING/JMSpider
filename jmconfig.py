@@ -21,8 +21,6 @@ os.makedirs(json_dir, exist_ok=True)
 # if not os.path.exists(json_dir):
 #     os.mkdir(json_dir)
 
-DOWNLOAD_QUEUE = os.path.join(json_dir, 'download_queue.json')
-DOWN_DEFUALT = {'download_queue': []}
 JSON_PATH = os.path.join(json_dir, 'config.json')
 DEFUALT_DATA = {
     "filter_tag": [
@@ -112,4 +110,3 @@ def config_init(file:str, defualt = None) -> dict:
     return conf
 
 cfg = config_init(JSON_PATH, DEFUALT_DATA)
-down_queue = config_init(DOWNLOAD_QUEUE, DOWN_DEFUALT)

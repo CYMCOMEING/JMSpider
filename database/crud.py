@@ -93,22 +93,17 @@ def search_data_to_db(db: Session, data: list) -> None:
         db (Session): 数据库
         data (list): 搜索数据，格式[[id, url],[id, url],...,[id, url]]
     """
-    is_modify = False
-    for item in data:
-        res = query_comic(db, item[0])
-        if res:
-            comic = res
-        else:
-            comic = models.Comic(comicid=item[0])
+    with db.begin():
+        for item in data:
+            res = query_comic(db, item[0])
+            if res:
+                comic = res
+            else:
+                comic = models.Comic(comicid=item[0])
 
-        if not comic.url:
-            # 不为空更新数据库
-            comic.url = item[1]
-            add_comic(db, comic, comic=False)
-            is_modify = True
-    
-    if is_modify:
-        db.commit()
+            if not comic.url:
+                comic.url = item[1]
+                db.add(comic)
 
 def page_data_to_db(db: Session, comicid:str, data: dict) -> models.Column:
     res = query_comic(db, comicid)

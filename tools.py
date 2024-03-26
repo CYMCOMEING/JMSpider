@@ -126,3 +126,20 @@ def delete_dir_contents(directory: str) -> None:
                 shutil.rmtree(file_path)
         except:
             pass
+
+def list_deduplication(l:list)->list:
+    """对列表中的列表进行去重
+    只能对列表下的列表进行去重，多重嵌套会报错
+    子列表内容相同，但是顺序不同，算是不同列表
+
+    Args:
+        l (list): 需要去重的列表
+
+    Returns:
+        list: 去重列表
+    """
+    # 由于列表是不可哈希的，不能直接将它们放入集合中。
+    # 需要先将列表转换为可哈希的类型（比如元组），
+    # 然后将其放入集合中去除重复项，最后再转换回列表。
+    # [[1, 2, 3], [4, 5, 6], [1, 2, 3], [7, 8, 9], [4, 5, 6]]
+    return list(map(list, set(map(tuple, l))))
