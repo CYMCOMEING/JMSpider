@@ -2,6 +2,9 @@
     "is_check": true,
     "is_redownload": true,
     "is_update_cookie":false,
+    "is_check_home_data":true,
+    "is_check_page_data":true,
+    "is_check_img_data":false,
     "filter_tag": [
         "yaoi",
         "cosplay",
@@ -26,7 +29,7 @@
         "動圖",
         "动图"
     ],
-    "save_dir": "D:\\禁漫天堂\\data\\禁漫天堂\\未整理",
+    "save_dir": "D:\\禁漫天堂\\data\\禁漫天堂\\测试",
     "download_file": "D:\\禁漫天堂\\data\\ids.txt",
     "out_zip": "D:\\禁漫天堂\\data\\禁漫天堂\\mcomic.zip",
     "filter_dir": [
@@ -34,7 +37,8 @@
         "D:\\禁漫天堂\\data\\禁漫天堂\\通过",
         "D:\\禁漫天堂\\data\\禁漫天堂\\黑名单",
         "D:\\禁漫天堂\\data\\禁漫天堂\\集合",
-        "D:\\禁漫天堂\\data\\禁漫天堂\\未整理"
+        "D:\\禁漫天堂\\data\\禁漫天堂\\未整理",
+        "D:\\禁漫天堂\\data\\禁漫天堂\\测试"
     ],
     "blacklist": "D:\\禁漫天堂\\data\\禁漫天堂\\黑名单",
     "username": "jm18268",
@@ -43,6 +47,7 @@
         "AVS": "o2nitg3kke5k02k1ll9o2mlrqs"
     },
     "cookie_update": "2024-03-14",
+    "proxies": {"http": "http://localhost:7890", "https": "http://localhost:7890"},
     "redownload": [],
     "redownloading": [
         "121351",

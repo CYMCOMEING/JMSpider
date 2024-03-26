@@ -23,6 +23,12 @@ os.makedirs(json_dir, exist_ok=True)
 
 JSON_PATH = os.path.join(json_dir, 'config.json')
 DEFUALT_DATA = {
+    "is_check": False,
+    "is_redownload": True,
+    "is_update_cookie":True,
+    "is_check_home_data":True,
+    "is_check_page_data":True,
+    "is_check_img_data":False,
     "filter_tag": [
         "yaoi",
         "cosplay",

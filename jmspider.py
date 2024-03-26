@@ -511,7 +511,8 @@ class JMSpider:
         if comic \
             and comic.url != '' \
             and comic.page == 0 \
-            and comic.comicid not in self.down_queue['home']:
+            and comic.comicid not in self.down_queue['home'] \
+            and self.cfg.get('is_check_home_data', True):
 
             with self.queue_lock:
                 self.down_queue['home'].append(comic.comicid)
@@ -528,7 +529,8 @@ class JMSpider:
         """
         if comic \
             and comic.curr_page == 0 \
-            and comic.comicid not in self.down_queue['page']:
+            and comic.comicid not in self.down_queue['page'] \
+            and self.cfg.get('is_check_page_data', True):
 
             with self.queue_lock:
                 self.down_queue['page'].append(comic.comicid)
@@ -546,7 +548,8 @@ class JMSpider:
         if comic \
             and comic.curr_page != 0 \
             and comic.static == 0 \
-            and comic.comicid not in self.down_queue['img']:
+            and comic.comicid not in self.down_queue['img'] \
+            and self.cfg.get('is_check_img_data', True):
 
             with self.queue_lock:
                 self.down_queue['img'][comic.comicid] = 0
