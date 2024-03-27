@@ -27,7 +27,6 @@ from threadingpool import MyTheadingPool, Future
 from MySigint import MySigint
 
 
-
 TMP_DIR = os.path.join('.', 'tmp')
 if not os.path.exists(TMP_DIR):
     os.makedirs(TMP_DIR)
@@ -299,12 +298,14 @@ class JMSpider:
             res_list['url'] = url[0]
 
         res_list['title'] = ''
-        title = root_element.xpath('//div[@class="panel-heading"]/div[@itemprop="name"]/h1/text()')
+        title = root_element.xpath(
+            '//div[@class="panel-heading"]/div[@itemprop="name"]/h1/text()')
         if title:
             res_list['title'] = title[0]
 
         res_list['comicid'] = ''
-        comicid = root_element.xpath('//div[@class="panel-body"]/div/div[2]/div[1]/div[1]/text()')
+        comicid = root_element.xpath(
+            '//div[@class="panel-body"]/div/div[2]/div[1]/div[1]/text()')
         if comicid:
             comp = re.compile(r'JM(\d+)')
             res = re.findall(comp, comicid[0])
@@ -312,17 +313,20 @@ class JMSpider:
                 res_list['comicid'] = res[0]
 
         res_list['tags'] = None
-        tags = root_element.xpath('//div[@class="panel-body"]/div/div[2]/div[1]/div[4]/span[@data-type="tags"]/a/text()')
+        tags = root_element.xpath(
+            '//div[@class="panel-body"]/div/div[2]/div[1]/div[4]/span[@data-type="tags"]/a/text()')
         if tags:
             res_list['tags'] = tags
 
         res_list['author'] = None
-        author = root_element.xpath('//div[@class="panel-body"]/div/div[2]/div[1]/div[5]/span/a/text()')
+        author = root_element.xpath(
+            '//div[@class="panel-body"]/div/div[2]/div[1]/div[5]/span/a/text()')
         if author:
             res_list['author'] = author
 
         res_list['description'] = ''
-        description = root_element.xpath('//div[@class="panel-body"]/div/div[2]/div[1]/div[8]/text()')
+        description = root_element.xpath(
+            '//div[@class="panel-body"]/div/div[2]/div[1]/div[8]/text()')
         if description:
             comp = re.compile(r'敘述：(.*)', re.DOTALL)
             res = re.findall(comp, description[0])
@@ -330,7 +334,8 @@ class JMSpider:
                 res_list['description'] = res[0]
 
         res_list['page'] = 0
-        page = root_element.xpath('//div[@class="panel-body"]/div/div[2]/div[1]/div[9]/text()')
+        page = root_element.xpath(
+            '//div[@class="panel-body"]/div/div[2]/div[1]/div[9]/text()')
         if page:
             comp = re.compile(r'頁數：(\d+)')
             res = re.findall(comp, page[0])
@@ -338,7 +343,8 @@ class JMSpider:
                 res_list['page'] = int(res[0])
 
         res_list['next'] = None
-        next = root_element.xpath('//div[@class="panel-body"]/div/div[2]/div[3]/div//ul/a/@data-album')
+        next = root_element.xpath(
+            '//div[@class="panel-body"]/div/div[2]/div[3]/div//ul/a/@data-album')
         if next:
             res_list['next'] = next
 
@@ -422,7 +428,8 @@ class JMSpider:
 
         # 启动ctrl+c信号监听
         is_interrupt = False
-        def handler(sigint_obg:MySigint):
+
+        def handler(sigint_obg: MySigint):
             print("接收到Ctrl+C信号")
             logger.info("接收到Ctrl+C信号")
             nonlocal is_interrupt
@@ -439,7 +446,7 @@ class JMSpider:
         comics = query_static(self.db, 0)
         for comic in comics:
             self.check_comic(comic.comicid)
-        
+
         # 主循环等待线程完成任务
         time.sleep(1)
         print('START')
@@ -452,7 +459,8 @@ class JMSpider:
             if tmp == self.down_count:
                 time.sleep(1)
             else:
-                print(f'\033[0K已经下载/剩余: {self.down_count}/{self.queue_count()}', end='')
+                print(
+                    f'\033[0K已经下载/剩余: {self.down_count}/{self.queue_count()}', end='')
                 tmp = self.down_count
 
         print('\nSTOP')
@@ -471,7 +479,7 @@ class JMSpider:
             return not self.down_queue['home'] \
                 and not self.down_queue['page'] \
                 and not self.down_queue['img']
-    
+
     def queue_count(self) -> int:
         """统计任务队列中的数量
 
@@ -508,10 +516,10 @@ class JMSpider:
             comicid (str): 漫画id
         """
         if comic \
-            and comic.url != '' \
-            and comic.page == 0 \
-            and comic.comicid not in self.down_queue['home'] \
-            and self.cfg.get('is_check_home_data', True):
+                and comic.url != '' \
+                and comic.page == 0 \
+                and comic.comicid not in self.down_queue['home'] \
+                and self.cfg.get('is_check_home_data', True):
 
             with self.queue_lock:
                 self.down_queue['home'].append(comic.comicid)
@@ -527,9 +535,9 @@ class JMSpider:
             comicid (str): 漫画id
         """
         if comic \
-            and comic.curr_page == 0 \
-            and comic.comicid not in self.down_queue['page'] \
-            and self.cfg.get('is_check_page_data', True):
+                and comic.curr_page == 0 \
+                and comic.comicid not in self.down_queue['page'] \
+                and self.cfg.get('is_check_page_data', True):
 
             with self.queue_lock:
                 self.down_queue['page'].append(comic.comicid)
@@ -545,10 +553,10 @@ class JMSpider:
         """
 
         if comic \
-            and comic.curr_page != 0 \
-            and comic.static == 0 \
-            and comic.comicid not in self.down_queue['img'] \
-            and self.cfg.get('is_check_img_data', True):
+                and comic.curr_page != 0 \
+                and comic.static == 0 \
+                and comic.comicid not in self.down_queue['img'] \
+                and self.cfg.get('is_check_img_data', True):
 
             with self.queue_lock:
                 self.down_queue['img'][comic.comicid] = 0
@@ -561,11 +569,11 @@ class JMSpider:
                 comic_dir = self.get_comic_dir(
                     comic.comicid, comic.chapter_titile)
                 img_path = JMDirHandle.get_img_path(url, comic_dir)
-                if not os.path.exists(img_path): # 文件不存在则下载
+                if not os.path.exists(img_path):  # 文件不存在则下载
                     with self.queue_lock:
                         self.down_queue['img'][comic.comicid] += 1
 
-                    if is_complet: # 只触发一次
+                    if is_complet:  # 只触发一次
                         logger.info(f'{comic.comicid} 下载图片文件')
                     is_complet = False
 
@@ -602,7 +610,7 @@ class JMSpider:
             comicid (str): 漫画id
             img_path (str): 图片路径
             url (str): 图片链接
-        
+
         Returns:
             str: 漫画id
         """
@@ -631,7 +639,7 @@ class JMSpider:
 
         Args:
             comicid (str): 漫画id
-        
+
         Returns:
             str: 漫画id
         """
@@ -712,7 +720,7 @@ class JMSpider:
             comicid = future.result()
             self.check_comic(comicid)
             self.check_next(comicid)
-    
+
     def callback_img(self, future: Future):
         """回调函数，清空图片队列并对漫画图片进行一次检查
 
@@ -724,7 +732,7 @@ class JMSpider:
             with self.queue_lock:
                 if self.down_queue['img'][comicid] <= 0:
                     del self.down_queue['img'][comicid]
-            
+
             comic = query_comic(self.db, comicid)
             if comic:
                 self.check_img(comic)
@@ -1027,6 +1035,19 @@ class JMSpider:
         """
         save_dir = self.cfg.get('save_dir', os.path.abspath('.'))
         return JMDirHandle.create_comic_dir(comicid, title, save_dir)
+
+    def check_search(self):
+        """检查配置文件是否需要进行搜索
+        搜索完后清空配置文件
+        """
+        search_dict = self.cfg.get('search', {})
+        if search_dict:
+            key = search_dict.get('key', '')
+            max_page = search_dict.get('max_page', 0)
+            if key:
+                print(key, max_page)
+                self.search(key, max_page)
+                self.cfg['search'] = {"key": "", "max_page": 0}
 
 
 if __name__ == "__main__":

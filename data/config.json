@@ -1,10 +1,14 @@
 {
     "is_check": true,
     "is_redownload": true,
-    "is_update_cookie":false,
-    "is_check_home_data":true,
-    "is_check_page_data":true,
-    "is_check_img_data":false,
+    "is_update_cookie": false,
+    "is_check_home_data": true,
+    "is_check_page_data": true,
+    "is_check_img_data": false,
+    "search": {
+        "key": "",
+        "max_page": 0
+    },
     "filter_tag": [
         "yaoi",
         "cosplay",
@@ -44,7 +48,10 @@
         "AVS": "ujihs07clue9e3usbp2uq08rjo"
     },
     "cookie_update": "2024-03-14",
-    "proxies": {"http": "http://localhost:7890", "https": "http://localhost:7890"},
+    "proxies": {
+        "http": "http://localhost:7890",
+        "https": "http://localhost:7890"
+    },
     "redownload": [],
     "redownloading": []
 }

@@ -25,10 +25,14 @@ JSON_PATH = os.path.join(json_dir, 'config.json')
 DEFUALT_DATA = {
     "is_check": False,
     "is_redownload": True,
-    "is_update_cookie":True,
-    "is_check_home_data":True,
-    "is_check_page_data":True,
-    "is_check_img_data":False,
+    "is_update_cookie": True,
+    "is_check_home_data": True,
+    "is_check_page_data": True,
+    "is_check_img_data": False,
+    "search": {
+        "key": "",
+        "max_page": 0
+    },
     "filter_tag": [
         "yaoi",
         "cosplay",
@@ -60,37 +64,34 @@ DEFUALT_DATA = {
     "blacklist": "",
     "username": "",
     "password": "",
-    "cookie": {
-                "AVS": ""
-    },
+    "cookie": {"AVS": ""},
     "cookie_update": "",
     "proxies": None,
-    "redownload":[],
-    "redownloading":[]
+    "redownload": [],
+    "redownloading": []
 }
 
-# cfg = MyConfig().load(JSON_PATH)
-# if not cfg:
-#     cfg = deepcopy(DEFUALT_DATA)
 
-# def save_config(json_data: object):
-#     MyConfig.dump(json_data, JSON_PATH, DEFUALT_DATA)
 class MyConfig(dict):
     def __init__(self, config_path: str) -> None:
         self.fio = None
-        self.fio = open(config_path, 'a+', encoding='utf-8')
-        self.fio.seek(0)  # 追加方式打开，指针会在最后
+
+        # 文件不存在则创建文件
+        if not os.path.exists(config_path):
+            with open(config_path, 'w', encoding='utf-8'):
+                pass
+        self.fio = open(config_path, 'r+', encoding='utf-8') # 不能用a+，a+只能追加内容，不能在指定位置修改内容
         data = self.fio.read()
-        if not data: # 文件内容为空时，json会报错
+        if not data:  # 文件内容为空时，json会报错
             data = "{}"
         json_data = json.loads(data)
         self.update(json_data)
 
     def save(self):
         self.fio.seek(0)
-        json.dump(self, self.fio, ensure_ascii=False, indent=4)
+        json.dump(self, self.fio ,fioensure_ascii=False, indent=4)
         self.fio.flush()  # 将缓存刷新到磁盘
-        self.fio.truncate() # 清空指针位置后面的内容，会直接写磁盘
+        self.fio.truncate()  # 清空指针位置后面的内容，会直接写磁盘
 
     def close(self):
         if self.fio:
@@ -109,10 +110,12 @@ class MyConfig(dict):
     def get(self, key, default=None):
         return super().get(key, default)
 
-def config_init(file:str, defualt = None) -> dict:
+
+def config_init(file: str, defualt=None) -> dict:
     conf = MyConfig(file)
     if defualt and (not conf):
         conf.update(defualt)
     return conf
+
 
 cfg = config_init(JSON_PATH, DEFUALT_DATA)
