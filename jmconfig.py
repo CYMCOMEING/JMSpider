@@ -89,7 +89,7 @@ class MyConfig(dict):
 
     def save(self):
         self.fio.seek(0)
-        json.dump(self, self.fio ,fioensure_ascii=False, indent=4)
+        json.dump(self, self.fio ,ensure_ascii=False, indent=4)
         self.fio.flush()  # 将缓存刷新到磁盘
         self.fio.truncate()  # 清空指针位置后面的内容，会直接写磁盘
 

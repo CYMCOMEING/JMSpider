@@ -460,7 +460,7 @@ class JMSpider:
                 time.sleep(1)
             else:
                 print(
-                    f'\033[0K已经下载/剩余: {self.down_count}/{self.queue_count()}', end='')
+                    f'\033[0K已下载/剩余: {self.down_count}/{self.queue_count()}', end='')
                 tmp = self.down_count
 
         print('\nSTOP')
@@ -1045,7 +1045,6 @@ class JMSpider:
             key = search_dict.get('key', '')
             max_page = search_dict.get('max_page', 0)
             if key:
-                print(key, max_page)
                 self.search(key, max_page)
                 self.cfg['search'] = {"key": "", "max_page": 0}
 
