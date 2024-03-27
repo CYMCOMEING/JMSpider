@@ -27,8 +27,6 @@ from threadingpool import MyTheadingPool, Future
 from MySigint import MySigint
 
 
-# TODO git创建分支再提交，测试完成再合并
-# TODO 5.树莓派运行 6.控制台输出美化 7.图片查看器同步更新
 
 TMP_DIR = os.path.join('.', 'tmp')
 if not os.path.exists(TMP_DIR):
@@ -452,14 +450,12 @@ class JMSpider:
             except TimeoutError:
                 pass
             if tmp == self.down_count:
-                with self.queue_lock:
-                    print(self.down_queue)
                 time.sleep(1)
             else:
-                print(self.down_count)
+                print(f'\033[0K已经下载/剩余: {self.down_count}/{self.queue_count()}', end='')
                 tmp = self.down_count
 
-        print('STOP')
+        print('\nSTOP')
         self.pool.close()
         print(f'下载数:{self.down_count}')
         if not self.queue_is_empty():
@@ -475,6 +471,17 @@ class JMSpider:
             return not self.down_queue['home'] \
                 and not self.down_queue['page'] \
                 and not self.down_queue['img']
+    
+    def queue_count(self) -> int:
+        """统计任务队列中的数量
+
+        Returns:
+            int: _description_
+        """
+        with self.queue_lock:
+            return len(self.down_queue['home']) \
+                + len(self.down_queue['page']) \
+                + sum(self.down_queue['img'].values())
 
     def check_comic(self, comicid):
         """检查漫画缺少的数据，并下载
