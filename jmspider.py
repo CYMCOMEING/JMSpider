@@ -10,12 +10,12 @@ from lxml import etree
 from tqdm import tqdm
 
 from crawler import HtmlCrawler, WebpCrawler, HtmlTSLCrawler
-from tools import retry, count_sleep, get_subdir, list_deduplication
+from tools import retry, count_sleep, get_subdir, list_deduplication, clean_previous_line
 from playwright_tool import login
 from jmtools import JMImgHandle, JMDirHandle, extract_and_combine_numbers, log_filter_fail_id
 from jmconfig import cfg
 from jmlogger import logger
-from database.models import Comic
+from database.models import Comic, Chapter
 from database.database import db
 from database.crud import (add_comic,
                            query_comic,
@@ -47,7 +47,7 @@ class JMSpider:
     def __init__(self) -> None:
         self.cfg = cfg
         self.db = db
-        self.pool = MyTheadingPool()
+        self.pool = MyTheadingPool(max=3)
         self.queue_lock = Lock()  # 注意使用with只能操作self.down_queue，不能有其他代码，否则可能会死锁
         self.down_queue = {'home': [], 'page': [], 'img': {}}
         self.down_count = 0
@@ -417,8 +417,11 @@ class JMSpider:
         logger.info('接收到 Ctrl + C 信号')
         self.stop_flag = True
 
-    def download_comic_2(self) -> None:
+    def download_comic_2(self, download_comics:list[int]=None) -> None:
         """漫画下载
+
+        Args:
+            download_comics (list[int])): 要下载的漫画id
 
         对数据库中static==0的漫画进行检查数据是否完整
         page==0 进行主页数据获取
@@ -442,28 +445,45 @@ class JMSpider:
         else:
             print('监听ctrl+c信号失败')
 
-        # 检查static==0的漫画，然后启动线程下载数据
-        comics = query_static(self.db, 0)
-        for comic in comics:
-            self.check_comic(comic.comicid)
+        # 有参数就下载参数，没有参数就检查static==0的漫画，然后启动线程下载数据
+        if not download_comics:
+            comics = query_static(self.db, 0)
+            download_comics = [comic.comicid for comic in comics]
 
-        # 主循环等待线程完成任务
-        time.sleep(1)
+        task_len = len(download_comics)
+        task_index = 0
+
         print('START')
-        tmp = 0
-        while not is_interrupt and not self.queue_is_empty():
-            try:
-                self.pool.wait(timeout=1, logger=logger)  # 用来代替sleep
-            except TimeoutError:
-                pass
-            if tmp == self.down_count:
-                time.sleep(1)
-            else:
-                print(
-                    f'\033[0K已下载/剩余: {self.down_count}/{self.queue_count()}', end='')
-                tmp = self.down_count
+        while (not is_interrupt) and (task_index < task_len):
 
-        print('\nSTOP')
+            # 对任务进行分批处理，如果传入的数量过多，会导致线程任务过多而溢出
+            # 不使用range的步长参数，他会丢弃后面不足的步长
+            step = 10
+            if task_index + step >= task_len:
+                step = task_len - task_index
+            
+            for index in range(task_index, task_index+step):
+                self.check_comic(download_comics[index])
+
+            task_index += step
+
+            # 主循环等待线程完成任务
+            time.sleep(5)
+            print('')
+            tmp = 0
+            while not is_interrupt and not self.queue_is_empty():
+                try:
+                    self.pool.wait(timeout=1, logger=logger)  # 用来代替sleep
+                except TimeoutError:
+                    pass
+                if tmp == self.down_count:
+                    time.sleep(1)
+                else:
+                    clean_previous_line()
+                    print(f'已下载: {self.down_count} / 剩余: {self.queue_count()} / 线程任务数: {len(self.pool.futures)}')
+                    tmp = self.down_count
+
+        print('STOP')
         self.pool.close()
         print(f'下载数:{self.down_count}')
         if not self.queue_is_empty():
@@ -491,7 +511,7 @@ class JMSpider:
                 + len(self.down_queue['page']) \
                 + sum(self.down_queue['img'].values())
 
-    def check_comic(self, comicid):
+    def check_comic(self, comicid:int):
         """检查漫画缺少的数据，并下载
 
         Args:
@@ -508,6 +528,13 @@ class JMSpider:
             else:
                 # 是否需要下载图片
                 self.check_img(comic)
+
+            for chapter in comic.chapters:
+                if chapter.page == 0:
+                    self.check_page(chapter)
+                else:
+                    self.check_img(chapter)
+
 
     def check_home(self, comic: Comic):
         """检查该漫画主页数据是否需要下载，需要则添加线程
@@ -528,16 +555,20 @@ class JMSpider:
             if task:
                 task.add_done_callback(self.callback_download)
 
-    def check_page(self, comic: Comic):
+    def check_page(self, comic: Comic | Chapter):
         """检查该漫画页数数据是否需要下载，需要则添加线程
 
         Args:
-            comicid (str): 漫画id
+            comic (Comic | Chapter): 漫画id
         """
+        if isinstance(comic, Comic):
+            page = comic.curr_page
+        else:
+            page = comic.page
         if comic \
-                and comic.curr_page == 0 \
-                and comic.comicid not in self.down_queue['page'] \
-                and self.cfg.get('is_check_page_data', True):
+            and page == 0 \
+            and comic.comicid not in self.down_queue['page'] \
+            and self.cfg.get('is_check_page_data', True):
 
             with self.queue_lock:
                 self.down_queue['page'].append(comic.comicid)
@@ -545,18 +576,24 @@ class JMSpider:
             if task:
                 task.add_done_callback(self.callback_download)
 
-    def check_img(self, comic: Comic):
+    def check_img(self, comic: Comic | Chapter):
         """检查该漫画图片文件是否需要下载，需要则添加线程
 
         Args:
             comic (Comic): 漫画id
         """
+        if isinstance(comic, Comic):
+            page = comic.curr_page
+            title = comic.chapter_titile
+        else:
+            page = comic.page
+            title = comic.title
 
         if comic \
-                and comic.curr_page != 0 \
-                and comic.static == 0 \
-                and comic.comicid not in self.down_queue['img'] \
-                and self.cfg.get('is_check_img_data', True):
+            and page != 0 \
+            and comic.static == 0 \
+            and comic.comicid not in self.down_queue['img'] \
+            and self.cfg.get('is_check_img_data', True):
 
             with self.queue_lock:
                 self.down_queue['img'][comic.comicid] = 0
@@ -564,17 +601,14 @@ class JMSpider:
             is_complet = True
             # https://cdn-msp2.18comic.org/media/photos/551644/00001.webp
             base_url = 'https://cdn-msp2.18comic.org/media/photos/{}/{:05d}.webp'
-            for i in range(comic.curr_page):
+            for i in range(page):
                 url = base_url.format(comic.comicid, i+1)
-                comic_dir = self.get_comic_dir(
-                    comic.comicid, comic.chapter_titile)
+                comic_dir = self.get_comic_dir(comic.comicid, title)
                 img_path = JMDirHandle.get_img_path(url, comic_dir)
                 if not os.path.exists(img_path):  # 文件不存在则下载
                     with self.queue_lock:
                         self.down_queue['img'][comic.comicid] += 1
 
-                    if is_complet:  # 只触发一次
-                        logger.info(f'{comic.comicid} 下载图片文件')
                     is_complet = False
 
                     task = self.pool.add_task(
@@ -584,24 +618,25 @@ class JMSpider:
 
             if is_complet:
                 with self.queue_lock:
-                    del self.down_queue['img'][comic.comicid]
+                    if comic.comicid in self.down_queue['img']:
+                        del self.down_queue['img'][comic.comicid]
                 comic.static = 1
                 add_comic(self.db, comic)
                 logger.info(f'{comic.comicid} 图片下载完成')
 
-    def check_next(self, comicid: str):
-        """检查漫画是否有下一话，有的话对其进行检查
+    # def check_next(self, comicid: str):
+    #     """检查漫画是否有下一话，有的话对其进行检查
 
-        Args:
-            comicid (str): _description_
-        """
-        comic = query_comic(self.db, comicid)
-        if comic:
-            next = comic.next.split(' ')  # 空字符串会返回['']
-            # 当前id是第一章时，才进行检查后面章节，这样可以减少重复步骤
-            if comicid == next[0]:
-                for i in next[1:]:
-                    self.check_comic(i)
+    #     Args:
+    #         comicid (str): _description_
+    #     """
+    #     comic = query_comic(self.db, int(comicid))
+    #     if comic:
+    #         next = comic.next.split(' ')  # 空字符串会返回['']
+    #         # 当前id是第一章时，才进行检查后面章节，这样可以减少重复步骤
+    #         if comicid == next[0]:
+    #             for i in next[1:]:
+    #                 self.check_comic(i)
 
     def work_img(self, comicid: str, img_path: str, url: str) -> str:
         """线程函数，下载图片
@@ -719,7 +754,6 @@ class JMSpider:
         if future.done() and not future.cancelled():
             comicid = future.result()
             self.check_comic(comicid)
-            self.check_next(comicid)
 
     def callback_img(self, future: Future):
         """回调函数，清空图片队列并对漫画图片进行一次检查
@@ -733,7 +767,7 @@ class JMSpider:
                 if self.down_queue['img'][comicid] <= 0:
                     del self.down_queue['img'][comicid]
 
-            comic = query_comic(self.db, comicid)
+            comic = query_comic(self.db, int(comicid))
             if comic:
                 self.check_img(comic)
 
@@ -810,7 +844,7 @@ class JMSpider:
             if page_data != None and page_data.get('title', False):
                 # 4. 下载所有图片url
                 comic_dir = JMDirHandle.create_comic_dir(
-                    download_id, page_data['title'], save_dir)
+                    int(download_id), page_data['title'], save_dir)
                 for url in tqdm(download_urls):
                     try:
                         img_path = JMDirHandle.get_img_path(url, comic_dir)
@@ -1026,11 +1060,11 @@ class JMSpider:
                         count += 1
         logger.info(f'检查{check_count}个有问题，添加到下载{count}个')
 
-    def get_comic_dir(self, comicid: str, title: str) -> str:
+    def get_comic_dir(self, comicid: int, title: str) -> str:
         """根据id和标题返回文件夹
 
         Args:
-            comicid (str): 漫画id
+            comicid (int): 漫画id
             title (str): 漫画标题(数据库的chapter_titile列)
         """
         save_dir = self.cfg.get('save_dir', os.path.abspath('.'))
@@ -1064,3 +1098,11 @@ if __name__ == "__main__":
 
     # TODO 模块化,命令行模式
     # 近親 NTR 母子 乱伦 亂倫 换母 亂交
+    
+        
+
+
+    
+
+    
+

@@ -216,15 +216,15 @@ class JMDirHandle:
             comicid = yield comicid in ids
 
     @staticmethod
-    def create_comic_dir(comicid: str, title: str, save_dir: str) -> str:
+    def create_comic_dir(comicid: int, title: str, save_dir: str) -> str:
         """根据参数创建comic目录
         """
         dir = os.path.join(save_dir,
-                           get_efficacious_filename('-'.join((comicid, title)))
+                           get_efficacious_filename('-'.join((str(comicid), title)))
                            )
-        os.makedirs(dir, exist_ok=True)
-        # if not os.path.exists(dir):
-        #     os.mkdir(dir)
+        # os.makedirs(dir, exist_ok=True)
+        if not os.path.exists(dir):
+            os.mkdir(dir)
         return dir
 
     def get_img_path(url, save_dir: str) -> str:

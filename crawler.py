@@ -3,7 +3,7 @@ from io import BytesIO
 import requests
 from requests import Response
 from curl_cffi import requests as cffi_requests
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 
 
 class RequestError(Exception):
@@ -50,9 +50,15 @@ class WebpCrawler(Crawler):
         response = super().get()
         if response and (response.headers.get('Content-Type', '') == r'image/webp'):
             # 图片是webp格式，转jpg
-            with Image.open(BytesIO(response.content)) as img:
-                jpg_img = img.convert('RGB')
-                jpg_img.save(save_file)
+            try:
+                with Image.open(BytesIO(response.content)) as img:
+                    jpg_img = img.convert('RGB')
+                    jpg_img.save(save_file)
+                    return True
+            except UnidentifiedImageError:
+                # 请求成功，但是数数据有问题，就创建一个像素的图片
+                img = Image.new('RGB', (1, 1), color = (255, 255, 255))
+                img.save(save_file)
                 return True
         return False
 
