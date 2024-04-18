@@ -223,8 +223,11 @@ class JMDirHandle:
                            get_efficacious_filename('-'.join((str(comicid), title)))
                            )
         # os.makedirs(dir, exist_ok=True)
-        if not os.path.exists(dir):
-            os.mkdir(dir)
+        try:
+            if not os.path.exists(dir):
+                os.mkdir(dir)
+        except Exception as e:
+            print(e)
         return dir
 
     def get_img_path(url, save_dir: str) -> str:

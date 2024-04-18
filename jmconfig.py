@@ -23,12 +23,6 @@ os.makedirs(json_dir, exist_ok=True)
 
 JSON_PATH = os.path.join(json_dir, 'config.json')
 DEFUALT_DATA = {
-    "is_check": False,
-    "is_redownload": True,
-    "is_update_cookie": True,
-    "is_check_home_data": True,
-    "is_check_page_data": True,
-    "is_check_img_data": False,
     "search": {
         "key": "",
         "max_page": 0
@@ -57,18 +51,19 @@ DEFUALT_DATA = {
         "動圖",
         "动图"
     ],
-    "save_dir": os.path.abspath('.'),
-    "download_file": "",
+    "save_dir": "",
     "out_zip": "",
-    "filter_dir": [],
+    "filter_dir": [
+    ],
     "blacklist": "",
     "username": "",
     "password": "",
-    "cookie": {"AVS": ""},
+    "cookie": {
+        "AVS": "ujihs07clue9e3usbp2uq08rjo",
+        "_gali": "wrapper"
+    },
     "cookie_update": "",
-    "proxies": None,
-    "redownload": [],
-    "redownloading": []
+    "proxies": {}
 }
 
 

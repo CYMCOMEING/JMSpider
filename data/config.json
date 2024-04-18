@@ -1,10 +1,4 @@
 {
-    "is_check": true,
-    "is_redownload": true,
-    "is_update_cookie": false,
-    "is_check_home_data": true,
-    "is_check_page_data": true,
-    "is_check_img_data": false,
     "search": {
         "key": "",
         "max_page": 0
@@ -33,13 +27,13 @@
         "動圖",
         "动图"
     ],
-    "save_dir": "D:\\禁漫天堂\\data\\禁漫天堂\\测试",
-    "download_file": "D:\\禁漫天堂\\data\\ids.txt",
+    "save_dir": "D:\\禁漫天堂\\data\\禁漫天堂\\下载中",
     "out_zip": "D:\\禁漫天堂\\data\\禁漫天堂\\mcomic.zip",
     "filter_dir": [
         "D:\\禁漫天堂\\data\\禁漫天堂\\通过",
         "D:\\禁漫天堂\\data\\禁漫天堂\\集合",
-        "D:\\禁漫天堂\\data\\禁漫天堂\\未整理"
+        "D:\\禁漫天堂\\data\\禁漫天堂\\未整理",
+        "D:\\禁漫天堂\\data\\禁漫天堂\\下载中"
     ],
     "blacklist": "D:\\禁漫天堂\\data\\禁漫天堂\\黑名单",
     "username": "jm18268",
@@ -52,7 +46,5 @@
     "proxies": {
         "http": "http://localhost:7890",
         "https": "http://localhost:7890"
-    },
-    "redownload": [],
-    "redownloading": []
+    }
 }
