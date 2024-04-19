@@ -461,7 +461,7 @@ class JMSpider:
         if is_fail:
             comicimg = query_comicimg_by_url(self.db, comicid, url)
             page = query_comicimg_arr(self.db, comicimg, ComicImg.page)
-            result['page'] = page
+            result['page'] = page[0]
             return result
 
         result['success'] = True
@@ -685,19 +685,6 @@ class JMSpider:
             print('监听ctrl+c信号失败')
             logger.warning('监听ctrl+c信号失败')
 
-        # 检查数据库，添加任务
-        # comics = query_static(self.db, 0)
-        # if comics:
-        #     print(f'检查数据库，添加任务, 检查数量{len(comics)}')
-        #     logger.info(f'检查数据库，添加任务, 检查数量{len(comics)}')
-        #     for comic in comics:
-        #         comicid = queue_comic_arr(self.db, comic, Comic.comicid)
-        #         if comicid:
-        #             try:
-        #                 self.check_comic(comicid[0])
-        #             except Exception as e:
-        #                 logger.error(f'{comicid[0]} check_comic出错. {e}')
-
         # 循环下载
         print('Starting')
         logger.info('Starting')
@@ -903,7 +890,6 @@ class JMSpider:
         is_downloading = False
         is_add_task = False
         is_complet = True
-        count = 0
         for url, page in imgs:
             img_path = self.get_img_path(comicid, url)
             if not img_path:
@@ -914,7 +900,6 @@ class JMSpider:
             if self.chenck_queue(2, comicid, page):
                 if os.path.exists(img_path):
                     self.remove_task_from_queue(2, comicid, page)
-                    count += 1
                 else:
                     is_downloading = True
                     is_complet = False
@@ -923,16 +908,12 @@ class JMSpider:
                 self.add_task_to_queue(2, comicid, page)
                 is_complet = False
                 is_add_task = True
-            else:
-                count += 1
+
                 
         if not is_downloading and  is_add_task:
             # 没有下载中任务且进行添加任务，表示第一次下载
             # 这里主要用于发log
             logger.info(f'{comicid} 图片开始下载')
-
-        if count == len(imgs):
-            logger.info(f'{comicid} 图片完成')
 
         return is_complet
         
