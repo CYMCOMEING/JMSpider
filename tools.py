@@ -27,6 +27,8 @@ def retry(times: int = 3, sleep: int = 0, logger: Logger = None):
                             f"{key}={value}" for key, value in kwargs.items())
                         logger.info(
                             f'[function]:{func.__name__},[args]:{args_s},[kwargs]:{kwargs_s},[Error]:{e}')
+                    else:
+                        raise e
                     if sleep:
                         time.sleep(sleep)
                 if res:

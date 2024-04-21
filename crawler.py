@@ -48,7 +48,7 @@ class WebpCrawler(Crawler):
 
     def get(self, save_file:str) -> bool:
         response = super().get()
-        if response and (response.headers.get('Content-Type', '') == r'image/webp'):
+        if response and (response.headers.get('Content-Type', '') in (r'image/webp', r'image/gif')):
             # 图片是webp格式，转jpg
             try:
                 with Image.open(BytesIO(response.content)) as img:
@@ -60,7 +60,8 @@ class WebpCrawler(Crawler):
                 img = Image.new('RGB', (1, 1), color = (255, 255, 255))
                 img.save(save_file)
                 return True
-        return False
+        else:
+            raise TypeError(f'响应数据类型不是图. Content-Type:{response.headers.get("Content-Type", "")}')
 
 class TSLCrawler:
 

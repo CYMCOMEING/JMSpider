@@ -448,8 +448,9 @@ class JMSpider:
             if res:
                 # 还原下载的图片
                 if comicid >= self._transform_id:
-                    JMImgHandle.restore_img(str(comicid), os.path.basename(
-                        img_path).split('.')[0], img_path)
+                    if r'.gif' != url[-4:]:  # 图片是gif格式的，不用还原
+                        JMImgHandle.restore_img(str(comicid), os.path.basename(
+                            img_path).split('.')[0], img_path)
             else:
                 logger.warning(f'{comicid} 下载图片失败, [url]: {url}')
                 is_fail = True
@@ -702,7 +703,7 @@ class JMSpider:
                                 self.check_comic(comicid[0])
                             except Exception as e:
                                 logger.error(f'{comicid[0]} check_comic出错. {e}')
-            # self.check_comic(496191)
+            # self.check_comic(410261)
             
             self.task_to_pool()
 
@@ -827,7 +828,7 @@ class JMSpider:
                             chapter = modify_chapter(self.db, chapter, static=1)
             
                 statics = query_comic_chapters(db, comic, Chapter.static)
-                statics = [static[0] for static in statics]
+                statics = [static[0] == 1 for static in statics]
                 if all(statics):
                     comic = modify_comic(self.db, comic, static=1)
                     logger.info(f'{comicid} 完成，共{len(chapters)}话')
@@ -947,7 +948,17 @@ class JMSpider:
             return None
         title = query_chapter_arr(self.db, chapter, Chapter.title)
         title = title[0]
-        comic_dir = self.get_comic_dir(comicid, title)
+        comic_dir = None
+        try:
+            comic_dir = self.get_comic_dir(comicid, title)
+        except Exception as e:
+            logger.error(e)
+            comic = query_chapter_comic(self.db, chapter, Comic)
+            if comic:
+                comic = modify_comic(self.db, comic, static=5)
+                comicid = query_comic_arr(self.db, comic, Comic.comicid)
+                if comicid:
+                    logger.info(f'{comicid[0]} 状态static设置为5')
         if not comic_dir:
             return None
         return JMDirHandle.get_img_path(url, comic_dir)

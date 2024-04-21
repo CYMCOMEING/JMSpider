@@ -3,6 +3,7 @@ import os
 import re
 from zipfile import ZipFile, ZIP_DEFLATED
 
+import platform
 from PIL import Image
 from tqdm import tqdm
 
@@ -13,6 +14,7 @@ from tools import (traversal_dir,
                    delete_dir_contents,
                    )
 
+OS_NAME = platform.system()
 
 class JMImgHandle:
 
@@ -222,12 +224,13 @@ class JMDirHandle:
         dir = os.path.join(save_dir,
                            get_efficacious_filename('-'.join((str(comicid), title)))
                            )
-        # os.makedirs(dir, exist_ok=True)
-        try:
-            if not os.path.exists(dir):
-                os.mkdir(dir)
-        except Exception as e:
-            print(e)
+        
+        if OS_NAME == 'Linux':
+            if len(dir) >= 255:
+                raise Exception(f'dir name too long: {dir}')
+            
+        if not os.path.exists(dir):
+            os.mkdir(dir)
         return dir
 
     def get_img_path(url, save_dir: str) -> str:
