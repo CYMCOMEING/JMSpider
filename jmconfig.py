@@ -23,6 +23,17 @@ os.makedirs(json_dir, exist_ok=True)
 
 JSON_PATH = os.path.join(json_dir, 'config.json')
 DEFUALT_DATA = {
+    "progress_log": 60,
+    "download_content":{
+        "comic":True,
+        "chapter":True,
+        "img":True
+    },
+    "download_priority":{
+        "comic":0,
+        "chapter":1,
+        "img":2
+    },
     "search": {
         "key": "",
         "max_page": 0
@@ -53,9 +64,6 @@ DEFUALT_DATA = {
     ],
     "save_dir": "",
     "out_zip": "",
-    "filter_dir": [
-    ],
-    "blacklist": "",
     "username": "",
     "password": "",
     "cookie": {

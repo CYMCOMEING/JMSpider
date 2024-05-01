@@ -43,8 +43,15 @@ class JMSpider:
         self.db = db
         self.pool = MyTheadingPool(max=5)
         self.queue_lock = Lock()  # 注意使用with只能操作self.task_queue，不能有其他代码，否则可能会死锁
-        self.task_queue = {'comic':{}, 'chapter':{}, 'img':{}}
+        self.task_queue = {'comic': {}, 'chapter': {}, 'img': {}}
         self.success_count = 0
+        # 下载优先级
+        self.download_priority = sorted(
+            [(k, v) for k, v in self.cfg['download_priority'].items()], key=lambda x: x[1])
+        self.priority_func = {"comic": self.pop_comic_task_from_queue,
+                              "chapter": self.pop_chapter_task_from_queue,
+                              "img": self.pop_img_task_from_queue}
+        self.download_content = self.cfg.get("download_content", {})
 
     def update_cookies(self) -> bool:
         """自动登录，获取cookie写入配置中
@@ -144,7 +151,7 @@ class JMSpider:
         if next_comic:
             next_comic = next_comic[0].split('/')[-1].split('?')[0]
             ret_data['next_comic'] = next_comic
-        
+
         # 上一话
         previous_comic = root_element.xpath(
             '//i[@class="fa fa-angle-double-left"]/../@href')
@@ -174,12 +181,14 @@ class JMSpider:
 
         # 获取介绍页面链接
         ret_data['home_url'] = None
-        home_url = root_element.xpath('//div[@class="menu-bolock hidden-xs hidden-sm"]/ul[2]/li[6]/a/@href')
+        home_url = root_element.xpath(
+            '//div[@class="menu-bolock hidden-xs hidden-sm"]/ul[2]/li[6]/a/@href')
         if home_url and home_url[0] != 'javascript:void(0)':
             ret_data['home_url'] = ''.join((cls._root_url, home_url[0]))
-        
+
         if not ret_data['home_url']:
-            home_url = root_element.xpath('//div[@class="menu-bolock hidden-xs hidden-sm"]/ul[2]/li[5]/a/@href')
+            home_url = root_element.xpath(
+                '//div[@class="menu-bolock hidden-xs hidden-sm"]/ul[2]/li[5]/a/@href')
             if home_url:
                 ret_data['home_url'] = ''.join((cls._root_url, home_url[0]))
 
@@ -414,24 +423,25 @@ class JMSpider:
         '''
         data = root_element.xpath('//ul[@class="pagination"]/li[8]/a/text()')
         if data and data[0] == '»':
-            data = root_element.xpath('//ul[@class="pagination"]/li[5]/a/text()')
+            data = root_element.xpath(
+                '//ul[@class="pagination"]/li[5]/a/text()')
         if data and data[0].isdecimal():
             page = int(data[0])
-        
+
         data = root_element.xpath('//ul[@class="pagination"]/li[9]/a/text()')
         if data and data[0].isdecimal():
             if int(data[0]) > page:
                 page = int(data[0])
-        
-        data = root_element.xpath('//ul[@class="pagination"]/li[8]/span/text()')
+
+        data = root_element.xpath(
+            '//ul[@class="pagination"]/li[8]/span/text()')
         if data and data[0].isdecimal():
             if int(data[0]) > page:
                 page = int(data[0])
 
         return page
 
-
-    def work_img(self, comicid: int, url: str, img_path:str) -> dict:
+    def work_img(self, comicid: int, url: str, img_path: str) -> dict:
         """下载图片线程函数
 
         Args:
@@ -441,7 +451,7 @@ class JMSpider:
         Returns:
             dict: 返回{'comicid': 漫画id, 'type': 2, 'img_path':下载路径}
         """
-        result = {'success':False, 'comicid': comicid, 'type': 2}
+        result = {'success': False, 'comicid': comicid, 'type': 2}
         is_fail = False
         try:
             res = self.download_comic_img(url, img_path)
@@ -467,7 +477,7 @@ class JMSpider:
 
         result['success'] = True
         return result
-    
+
     def work_page_data(self, comicid: int) -> dict:
         """下载漫画页面数据并添加到数据库
         线程函数
@@ -481,7 +491,7 @@ class JMSpider:
         logger.info(f'{comicid} 下载页数数据')
         is_error = False
         tmp_file = os.path.join(TMP_DIR, f'{comicid}_page.html')
-        result = {'success':False, 'comicid': comicid, 'type': 1}
+        result = {'success': False, 'comicid': comicid, 'type': 1}
         try:
             res = self.download_comic_page(
                 str(comicid), tmp_file, self.cfg.get('cookie', None))
@@ -530,10 +540,12 @@ class JMSpider:
         """
         logger.info(f'{comicid} 下载主页数据')
         tmp_file = os.path.join(TMP_DIR, f'{comicid}_home.html')
-        result = {'success':False, 'comicid': comicid, 'type':0, 'is_del':False}
+        result = {'success': False, 'comicid': comicid,
+                  'type': 0, 'is_del': False}
         try:
             if not url:
-                res = self.download_comic_page(str(comicid), tmp_file, self.cfg.get('cookie', None))
+                res = self.download_comic_page(
+                    str(comicid), tmp_file, self.cfg.get('cookie', None))
                 if res:
                     page_data = self.parse_comic_page(tmp_file)
                     # https://18comic.org/javascript:void(0)
@@ -619,20 +631,13 @@ class JMSpider:
             os.unlink(html_file)
         logger.info(f'搜索[{key}]完成')
 
-    def del_blacklist(self):
-        """删除黑名单的内容，但是保留带comicid的目录
-        """
-        dir = self.cfg.get('blacklist', None)
-        if dir:
-            JMDirHandle.comic_clean(dir)
-
     def zip_comic(self, comicids: list) -> list:
         '''根据id列表打包漫画
         '''
         if not comicids:
             return []
         comicids = list(set(comicids))
-        dirs = self.cfg.get('filter_dir', [])
+        dirs = self.cfg.get('save_dir', [])
         zip_dirs = JMDirHandle.get_comics_dirs(comicids, dirs)
         if comicids:
             logger.warning(f'打包过程中，出现找到对应的文件 {" ".join(comicids)}')
@@ -667,7 +672,7 @@ class JMSpider:
         import platform
         os_name = platform.system()
         logger.info(f'当前系统是: {os_name}')
-        
+
         # 启动ctrl+c信号监听
         is_interrupt = False
 
@@ -686,31 +691,46 @@ class JMSpider:
             print('监听ctrl+c信号失败')
             logger.warning('监听ctrl+c信号失败')
 
+        # 数据库中未完成的漫画
+        comics = query_static(self.db, 0)
+        comic_index = 0
+        logger.info(f'未完成的漫画数:{len(comics)}')
+
         # 循环下载
         print('Starting')
         logger.info('Starting')
+        progress_log_time = self.cfg.get('progress_log', 60)
         start_time = time.time()
         tmp_time = start_time
         while not is_interrupt:
 
             if self.queue_count() < 100:
-                comics = query_static(self.db, 0)
                 if comics:
-                    for comic in comics[:100]:
-                        comicid = queue_comic_arr(self.db, comic, Comic.comicid)
-                        if comicid:
-                            try:
-                                self.check_comic(comicid[0])
-                            except Exception as e:
-                                logger.error(f'{comicid[0]} check_comic出错. {e}')
+                    if comic_index >= len(comics):
+                        break
+                    while self.queue_count() < 100 and comic_index < len(comics) and not is_interrupt:
+                        static = queue_comic_arr(
+                            self.db, comics[comic_index], Comic.static)
+                        if static == 1:
+                            comics.remove(comics[comic_index])
+                        else:
+                            comicid = queue_comic_arr(
+                                self.db, comics[comic_index], Comic.comicid)
+                            if comicid:
+                                try:
+                                    self.check_comic(comicid[0])
+                                except Exception as e:
+                                    logger.error(
+                                        f'{comicid[0]} check_comic出错. {e}')
+                        comic_index += 1
             # self.check_comic(410261)
-            
+
             self.task_to_pool()
 
             if len(self.pool.futures) == 0 and self.is_empty_queue():
                 # 没有任务
-                    break
-            
+                break
+
             try:
                 self.pool.wait(timeout=1, logger=logger)
             except TimeoutError:
@@ -720,17 +740,19 @@ class JMSpider:
 
             if os_name != "Linux":
                 clean_previous_line()
-            print(f'完成数: { self.success_count} 线程任务数: {len(self.pool.futures)} 剩余任务数: {self.queue_count()}')
+            print(
+                f'完成数: { self.success_count} 线程任务数: {len(self.pool.futures)} 剩余任务数: {self.queue_count()}')
             end_time = time.time()
-            if end_time - tmp_time >= 600:
-                logger.info(f'完成数: { self.success_count} 线程任务数: {len(self.pool.futures)} 剩余任务数: {self.queue_count()}')
+            if end_time - tmp_time >= progress_log_time:
+                logger.info(
+                    f'完成数: { self.success_count} 线程任务数: {len(self.pool.futures)} 剩余任务数: {self.queue_count()}')
                 tmp_time = end_time
-        
-        
+
         print('Stoping')
         logger.info('Stoping')
         self.pool.wait(logger=logger)
-        logger.info(f'完成数: { self.success_count} 线程任务数: {len(self.pool.futures)} 剩余任务数: {self.queue_count()}')
+        logger.info(
+            f'完成数: { self.success_count} 线程任务数: {len(self.pool.futures)} 剩余任务数: {self.queue_count()}')
         if self.queue_count() > 0:
             print(self.task_queue)
             logger.info(self.task_queue)
@@ -743,7 +765,7 @@ class JMSpider:
         execution_time %= 60
         seconds = execution_time
         logger.info(f'总运行时间: {hours:02d}时{minutes:02d}分{seconds:02.2f}秒')
-    
+
     def task_to_pool(self) -> bool:
         is_add = False
         if len(self.pool.futures) <= 5:
@@ -757,7 +779,8 @@ class JMSpider:
                     comic = query_comic(self.db, task[1])
                     if comic:
                         url = comic.url
-                    future = self.pool.add_task(self.work_home_data, task[1], url)
+                    future = self.pool.add_task(
+                        self.work_home_data, task[1], url)
                     if future:
                         future.add_done_callback(self.callback_download)
                 elif task[0] == 1:
@@ -770,11 +793,12 @@ class JMSpider:
                     url = url[0]
                     img_path = self.get_img_path(task[1][0], url)
                     if not os.path.exists(img_path):
-                        future = self.pool.add_task(self.work_img, task[1][0], url, img_path)
+                        future = self.pool.add_task(
+                            self.work_img, task[1][0], url, img_path)
                         if future:
                             future.add_done_callback(self.callback_download)
         return is_add
-    
+
     def callback_download(self, future: Future):
         """回调函数，主页数据和页面数据线程callbakc
         判断漫画缺少哪些数据就补齐那部分的数据
@@ -791,33 +815,33 @@ class JMSpider:
                 elif result['type'] == 1 or result['type'] == 2:
                     chapter = query_chapter(self.db, result['comicid'])
                     if chapter:
-                        comicid = query_chapter_comic(self.db, chapter, Comic.comicid)
+                        comicid = query_chapter_comic(
+                            self.db, chapter, Comic.comicid)
                         if comicid:
                             self.check_comic(comicid[0])
                         else:
                             raise Exception(f"章节 {result['comicid']} 没有搜索到主页")
             else:
                 if result['type'] == 0:
-                    self.remove_task_from_queue(0,result['comicid'])
+                    self.remove_task_from_queue(0, result['comicid'])
                     if result.get('is_del', False):
                         comic = query_comic(self.db, result['comicid'])
                         if comic:
                             del_comic(self.db, comic)
                 if result['type'] == 1:
-                    self.remove_task_from_queue(1,result['comicid'])
+                    self.remove_task_from_queue(1, result['comicid'])
                 if result['type'] == 2:
                     # 重置任务，继续下载
-                    self.reset_task_from_queue(2, result['comicid'], result['page'])
+                    self.reset_task_from_queue(
+                        2, result['comicid'], result['page'])
 
-
-    
-    def check_comic(self, comicid:int) -> bool:
+    def check_comic(self, comicid: int) -> bool:
         comic = query_comic(self.db, comicid)
         if comic:
             is_done = self.check_homedata(comic)
             if not is_done:
                 return
-            
+
             chapters = query_comic_chapters(db, comic, Chapter)
             if chapters:
                 for chapter in chapters:
@@ -825,8 +849,9 @@ class JMSpider:
                     if is_done:
                         is_done = self.check_img(chapter)
                         if is_done:
-                            chapter = modify_chapter(self.db, chapter, static=1)
-            
+                            chapter = modify_chapter(
+                                self.db, chapter, static=1)
+
                 statics = query_comic_chapters(db, comic, Chapter.static)
                 statics = [static[0] == 1 for static in statics]
                 if all(statics):
@@ -834,9 +859,6 @@ class JMSpider:
                     logger.info(f'{comicid} 完成，共{len(chapters)}话')
                     return True
         return False
-            
-            
-            
 
     def check_chapter(self, chapter: Chapter) -> bool:
         """判断是否添加页面任务
@@ -844,39 +866,43 @@ class JMSpider:
         Args:
             comic (Chapter): 章节对象
         """
-        comicid, page = query_chapter_arr(self.db, chapter, Chapter.comicid, Chapter.page)
+        comicid, page = query_chapter_arr(
+            self.db, chapter, Chapter.comicid, Chapter.page)
         imgs = query_chapter_imgs(self.db, chapter, ComicImg.page)
-        
+
         if not imgs or page == 0 or len(imgs) != page:
             if self.chenck_queue(1, comicid):
                 return False
-            self.add_task_to_queue(1, comicid)
+            if self.download_content.get("chapter", True):
+                self.add_task_to_queue(1, comicid)
         else:
             if self.remove_task_from_queue(1, comicid):
                 logger.info(f'{comicid} 章节数据已经完成')
             return True
-        
+
         return False
 
-    def check_homedata(self, comic: Comic)->bool:
+    def check_homedata(self, comic: Comic) -> bool:
         """判断是否添加主页任务
 
         Args:
             comic (Comic): 漫画对象
         """
-        comicid, page = query_comic_arr(self.db, comic, Comic.comicid, Comic.page)
+        comicid, page = query_comic_arr(
+            self.db, comic, Comic.comicid, Comic.page)
         if page == 0:
             if self.chenck_queue(0, comicid):
                 return False
-            self.add_task_to_queue(0, comicid)
+            if self.download_content.get("comic", True):
+                self.add_task_to_queue(0, comicid)
         else:
             if self.remove_task_from_queue(0, comicid):
                 logger.info(f'{comicid} 主页数据已经完成')
             return True
-        
+
         return False
 
-    def check_img(self, chapter: Chapter)->bool:
+    def check_img(self, chapter: Chapter) -> bool:
         """判断是否下载页面数据
 
         Args:
@@ -884,10 +910,11 @@ class JMSpider:
         """
         comicid = query_chapter_arr(self.db, chapter, Chapter.comicid)
         comicid = comicid[0]
-        imgs = query_chapter_imgs(self.db, chapter, ComicImg.url, ComicImg.page)
+        imgs = query_chapter_imgs(
+            self.db, chapter, ComicImg.url, ComicImg.page)
         if not imgs:
             raise ValueError(f'该漫画{comicid}没有图片')
-        
+
         is_downloading = False
         is_add_task = False
         is_complet = True
@@ -906,18 +933,18 @@ class JMSpider:
                     is_complet = False
             # 如果不在任务，也没有本地文件，就添加任务
             elif not os.path.exists(img_path):
-                self.add_task_to_queue(2, comicid, page)
+                if self.download_content.get("img", True):
+                    self.add_task_to_queue(2, comicid, page)
+                    is_add_task = True
                 is_complet = False
-                is_add_task = True
 
-                
-        if not is_downloading and  is_add_task:
+        if not is_downloading and is_add_task:
             # 没有下载中任务且进行添加任务，表示第一次下载
             # 这里主要用于发log
             logger.info(f'{comicid} 图片开始下载')
 
         return is_complet
-        
+
     def check_comic_img_complet(self, chapter: Chapter) -> bool:
         """检查漫画是否完整
         通过文件数和页数比较
@@ -928,12 +955,13 @@ class JMSpider:
         Returns:
             bool: 文件数大于等于页数返回真
         """
-        comicid, title, page = query_chapter_arr(self.db, chapter, Chapter.comicid, Chapter.title, Chapter.page)
+        comicid, title, page = query_chapter_arr(
+            self.db, chapter, Chapter.comicid, Chapter.title, Chapter.page)
         comic_dir = self.get_comic_dir(comicid, title)
         files = traversal_dir(comic_dir)
         return len(files) >= page
-    
-    def get_img_path(self, comicid:int, url:str) -> str:
+
+    def get_img_path(self, comicid: int, url: str) -> str:
         """根据漫画下载url生成漫画的图片路径
 
         Args:
@@ -962,7 +990,7 @@ class JMSpider:
         if not comic_dir:
             return None
         return JMDirHandle.get_img_path(url, comic_dir)
-    
+
     def page_data_to_db(self, comicid: int, data: dict):
         """页面数据录入数据库
         通过判断home_url，来区分是都第一话，第一话写入comic表，非第一话写入chapter表
@@ -975,8 +1003,10 @@ class JMSpider:
         # 更新页面数据
         chapter = query_chapter(self.db, int(comicid))
         if not chapter:
-            chapter = add_chapter(self.db, models.Chapter(comicid=int(comicid)))
-        chapter = modify_chapter(self.db, chapter, page=data['curr_page'], title=data['title'])
+            chapter = add_chapter(
+                self.db, models.Chapter(comicid=int(comicid)))
+        chapter = modify_chapter(
+            self.db, chapter, page=data['curr_page'], title=data['title'])
         chapterid = query_chapter_arr(self.db, chapter, Chapter.id)
         chapterid = chapterid[0]
 
@@ -987,16 +1017,16 @@ class JMSpider:
                 img = add_comicimg(self.db, ComicImg(url=url, page=page))
             modify_chapter(self.db, chapter, imgs=img)
 
-    def chenck_queue(self, _type:int, comicid:int, page:int=0) -> bool:
+    def chenck_queue(self, _type: int, comicid: int, page: int = 0) -> bool:
         with self.queue_lock:
             if _type == 0:
                 return comicid in self.task_queue['comic']
             elif _type == 1:
                 return comicid in self.task_queue['chapter']
             elif _type == 2:
-                return (comicid,page) in self.task_queue['img']
-            
-    def add_task_to_queue(self, _type:int, comicid:int, page:int=0):
+                return (comicid, page) in self.task_queue['img']
+
+    def add_task_to_queue(self, _type: int, comicid: int, page: int = 0):
         with self.queue_lock:
             if _type == 0:
                 if not comicid in self.task_queue['comic']:
@@ -1005,10 +1035,10 @@ class JMSpider:
                 if not comicid in self.task_queue['chapter']:
                     self.task_queue['chapter'][comicid] = 0
             elif _type == 2:
-                if not (comicid,page) in self.task_queue['img']:
-                    self.task_queue['img'][(comicid,page)] = 0
-    
-    def remove_task_from_queue(self, _type:int, comicid:int, page:int=0) -> bool:
+                if not (comicid, page) in self.task_queue['img']:
+                    self.task_queue['img'][(comicid, page)] = 0
+
+    def remove_task_from_queue(self, _type: int, comicid: int, page: int = 0) -> bool:
         with self.queue_lock:
             if _type == 0:
                 if comicid in self.task_queue['comic']:
@@ -1019,28 +1049,40 @@ class JMSpider:
                     del self.task_queue['chapter'][comicid]
                     return True
             elif _type == 2:
-                if (comicid,page) in self.task_queue['img']:
-                    del self.task_queue['img'][(comicid,page)]
+                if (comicid, page) in self.task_queue['img']:
+                    del self.task_queue['img'][(comicid, page)]
                     return True
         return False
 
     def pop_task_from_queue(self):
-        with self.queue_lock:
-            for k,v in self.task_queue['comic'].items():
-                if v == 0:
-                    self.task_queue['comic'][k] = 1
-                    return (0,k)
-            for k,v in self.task_queue['chapter'].items():
-                if v == 0:
-                    self.task_queue['chapter'][k] = 1
-                    return (1,k)
-            for k,v in self.task_queue['img'].items():
-                if v == 0:
-                    self.task_queue['img'][k] = 1
-                    return (2,k)
+        for i in self.download_priority:
+            res = self.priority_func[i[0]]()
+            if res:
+                return res
         return None
-    
-    def reset_task_from_queue(self, _type:int, comicid:int, page:int=0):
+
+    def pop_comic_task_from_queue(self):
+        for k, v in self.task_queue['comic'].items():
+            if v == 0:
+                self.task_queue['comic'][k] = 1
+                return (0, k)
+        return None
+
+    def pop_chapter_task_from_queue(self):
+        for k, v in self.task_queue['chapter'].items():
+            if v == 0:
+                self.task_queue['chapter'][k] = 1
+                return (1, k)
+        return None
+
+    def pop_img_task_from_queue(self):
+        for k, v in self.task_queue['img'].items():
+            if v == 0:
+                self.task_queue['img'][k] = 1
+                return (2, k)
+        return None
+
+    def reset_task_from_queue(self, _type: int, comicid: int, page: int = 0):
         with self.queue_lock:
             if _type == 0:
                 if comicid in self.task_queue['comic']:
@@ -1049,9 +1091,9 @@ class JMSpider:
                 if comicid in self.task_queue['chapter']:
                     self.task_queue['chapter'][comicid] = 0
             elif _type == 2:
-                if (comicid,page) in self.task_queue['img']:
-                    self.task_queue['img'][(comicid,page)] = 0
-    
+                if (comicid, page) in self.task_queue['img']:
+                    self.task_queue['img'][(comicid, page)] = 0
+
     def is_empty_queue(self) -> bool:
         with self.queue_lock:
             return not any((self.task_queue['comic'], self.task_queue['chapter'], self.task_queue['img']))
@@ -1061,13 +1103,9 @@ class JMSpider:
             return len(self.task_queue['comic']) + len(self.task_queue['chapter']) + len(self.task_queue['img'])
 
 
-
 if __name__ == "__main__":
     pass
     jms = JMSpider()
-
-    # 删除黑名单的文件
-    # jms.del_blacklist()
 
     # 提取日志失败记录
     # print(log_filter_fail_id(r'data\jm_spider.log'))
@@ -1075,12 +1113,4 @@ if __name__ == "__main__":
     # 字符串提取comicid
     # jms.download_comic(extract_and_combine_numbers(''''''))
 
-    # TODO 模块化,命令行模式
-    
-        
-
-
-    
-
-    
-
+    # TODO 

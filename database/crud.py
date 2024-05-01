@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, func
 from threading import Lock
 import functools
 
@@ -307,3 +307,12 @@ def search_data_to_db(db: Session, data: list) -> None:
     if comics:
         db.add_all(comics)
         db.commit()
+
+'''
+other
+'''
+@lock(db_lock)
+def count_percent(db: Session, main_key, tag_key, tag_val) -> float:
+    count = db.query(func.count(main_key)).filter(tag_key == tag_val).scalar() 
+    total = db.query(func.count(main_key)).scalar()
+    return round(count / total * 100, 2)
