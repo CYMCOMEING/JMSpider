@@ -99,3 +99,22 @@ class HtmlTSLCrawler(TSLCrawler):
                 f.write(response.text)
                 return True
         return False
+    
+class ImgTSLCrawler(TSLCrawler):
+
+    def get(self, save_file:str) -> bool:
+        response = super().get()
+        if response and (r'image/' in response.headers.get('Content-Type', '')):
+            try:
+                # 图片转jpg
+                with Image.open(BytesIO(response.content)) as img:
+                    jpg_img = img.convert('RGB')
+                    jpg_img.save(save_file)
+                    return True
+            except UnidentifiedImageError:
+                # 请求成功，但是数据有问题，就创建一个像素的图片
+                img = Image.new('RGB', (1, 1), color = (255, 255, 255))
+                img.save(save_file)
+                return True
+        else:
+            raise TypeError(f'响应数据类型不是图. Content-Type:{response.headers.get("Content-Type", "")}')

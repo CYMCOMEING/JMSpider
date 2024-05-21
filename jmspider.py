@@ -9,10 +9,10 @@ import re
 from lxml import etree
 from tqdm import tqdm
 
-from crawler import HtmlCrawler, WebpCrawler, HtmlTSLCrawler
-from tools import retry, count_sleep, get_subdir, list_deduplication, clean_previous_line, traversal_dir, url_to_filename
+from crawler import HtmlCrawler, HtmlTSLCrawler, ImgTSLCrawler
+from tools import retry, count_sleep, list_deduplication, clean_previous_line, traversal_dir, url_to_filename
 from playwright_tool import login
-from jmtools import JMImgHandle, JMDirHandle, extract_and_combine_numbers, log_filter_fail_id
+from jmtools import JMImgHandle, JMDirHandle
 from jmconfig import cfg
 from jmlogger import logger
 from database.models import *
@@ -35,7 +35,8 @@ class JMSpider:
     """
 
     _transform_id = 220981  # 从这个id开始，图片都是乱序的，怎么得来的？一个个顺序排查的
-    _headers = {'user-agent': 'PostmanRuntime/7.36.1'}
+    # _headers = {'user-agent': 'PostmanRuntime/7.36.1'}
+    _headers = {'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'}
     _root_url = 'https://18comic.org/'
 
     def __init__(self) -> None:
@@ -194,10 +195,9 @@ class JMSpider:
 
         return ret_data
 
-    @classmethod
     @retry(sleep=1)
     @count_sleep
-    def download_comic_img(cls, url: str, save_file: str) -> bool:
+    def download_comic_img(self, url: str, save_file: str) -> bool:
         """下载图片
 
         Args:
@@ -207,8 +207,15 @@ class JMSpider:
         Returns:
             bool: 是否成功
         """
-        wc = WebpCrawler(url, headers=cls._headers)
-        return wc.get(save_file)
+        proxies = self.cfg.get('proxies', None)
+
+        itc = ImgTSLCrawler(url=url,
+                            headers=self._headers,
+                            cookies=None,
+                            proxies=proxies
+                            )
+        return itc.get(save_file)
+        
 
     @classmethod
     @retry(sleep=1)
@@ -466,7 +473,7 @@ class JMSpider:
                 is_fail = True
         except Exception as e:
             logger.warning(
-                f'{comicid} 下载图片发生错误[url]: {url}, [error]: {e}')
+                f'{comicid} 下载图片发生错误 [url]: {url}, [error]: {e}')
             is_fail = True
 
         if is_fail:
@@ -703,34 +710,30 @@ class JMSpider:
         start_time = time.time()
         tmp_time = start_time
         while not is_interrupt:
+            while comics and self.queue_count() < 100 and comic_index < len(comics) and not is_interrupt:
+                static = queue_comic_arr(
+                    self.db, comics[comic_index], Comic.static)
+                if static == 1:
+                    comics.remove(comics[comic_index])
+                else:
+                    comicid = queue_comic_arr(
+                        self.db, comics[comic_index], Comic.comicid)
+                    if comicid:
+                        try:
+                            self.check_comic(comicid[0])
+                        except Exception as e:
+                            logger.error(
+                                f'{comicid[0]} check_comic出错. {e}')
+                comic_index += 1
 
-            if self.queue_count() < 100:
-                if comics:
-                    if comic_index >= len(comics):
-                        break
-                    while self.queue_count() < 100 and comic_index < len(comics) and not is_interrupt:
-                        static = queue_comic_arr(
-                            self.db, comics[comic_index], Comic.static)
-                        if static == 1:
-                            comics.remove(comics[comic_index])
-                        else:
-                            comicid = queue_comic_arr(
-                                self.db, comics[comic_index], Comic.comicid)
-                            if comicid:
-                                try:
-                                    self.check_comic(comicid[0])
-                                except Exception as e:
-                                    logger.error(
-                                        f'{comicid[0]} check_comic出错. {e}')
-                        comic_index += 1
-            # self.check_comic(410261)
+            # self.check_comic(450324)
 
             self.task_to_pool()
-
             if len(self.pool.futures) == 0 and self.is_empty_queue():
                 # 没有任务
                 break
 
+            # 等待处理，延时
             try:
                 self.pool.wait(timeout=1, logger=logger)
             except TimeoutError:
@@ -738,6 +741,7 @@ class JMSpider:
             else:
                 time.sleep(1)
 
+            # 输出log
             if os_name != "Linux":
                 clean_previous_line()
             print(
@@ -751,12 +755,13 @@ class JMSpider:
         print('Stoping')
         logger.info('Stoping')
         self.pool.wait(logger=logger)
+        self.pool.close()
+        
         logger.info(
             f'完成数: { self.success_count} 线程任务数: {len(self.pool.futures)} 剩余任务数: {self.queue_count()}')
         if self.queue_count() > 0:
             print(self.task_queue)
             logger.info(self.task_queue)
-        self.pool.close()
         end_time = time.time()
         execution_time = end_time - start_time
         hours = int(execution_time // 3600)
@@ -866,11 +871,13 @@ class JMSpider:
         Args:
             comic (Chapter): 章节对象
         """
-        comicid, page = query_chapter_arr(
-            self.db, chapter, Chapter.comicid, Chapter.page)
-        imgs = query_chapter_imgs(self.db, chapter, ComicImg.page)
+        comicid, page, static = query_chapter_arr(
+            self.db, chapter, Chapter.comicid, Chapter.page, Chapter.static)
 
-        if not imgs or page == 0 or len(imgs) != page:
+        # 当漫画图片下载完成，static才置1
+        # 由于网站问题，有的漫画是空白的，页数是零
+        # 所以需要同时判断两个参数
+        if page == 0 and static == 0:
             if self.chenck_queue(1, comicid):
                 return False
             if self.download_content.get("chapter", True):
@@ -913,7 +920,8 @@ class JMSpider:
         imgs = query_chapter_imgs(
             self.db, chapter, ComicImg.url, ComicImg.page)
         if not imgs:
-            raise ValueError(f'该漫画{comicid}没有图片')
+            # 没有图片，就不用下载
+            return True
 
         is_downloading = False
         is_add_task = False
@@ -1101,6 +1109,25 @@ class JMSpider:
     def queue_count(self) -> int:
         with self.queue_lock:
             return len(self.task_queue['comic']) + len(self.task_queue['chapter']) + len(self.task_queue['img'])
+        
+    def check_1px_img(self):
+        """检查1像素图片
+
+        """
+        res_list= []
+        dir = self.cfg.get('save_dir', '')
+        if os.path.isdir(dir):
+            for sub_dir in os.listdir(dir):
+                if os.path.isdir(os.path.join(dir,sub_dir)):
+                    for file in os.listdir(os.path.join(dir,sub_dir)):
+                        if os.path.isfile(os.path.join(dir,sub_dir,file)):
+                            size = os.path.getsize(os.path.join(dir,sub_dir,file))
+                            if size < 1024:
+                                res_list.append(os.path.join(dir,sub_dir))
+                                break
+        
+        if res_list:
+            logger.info(f'{res_list}')
 
 
 if __name__ == "__main__":
@@ -1113,4 +1140,5 @@ if __name__ == "__main__":
     # 字符串提取comicid
     # jms.download_comic(extract_and_combine_numbers(''''''))
 
-    # TODO 
+    # TODO 实现数据库删除
+    # TODO 下载图片的，根据"image/jpg"格式判断图片类型
